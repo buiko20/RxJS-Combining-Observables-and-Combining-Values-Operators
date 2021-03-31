@@ -1,6 +1,6 @@
 import { addItem, run } from '../04-utils';
-import { delay, switchMap, take, pluck, map, tap, takeLast, first, mapTo, startWith, ignoreElements, endWith, scan, withLatestFrom } from 'rxjs/operators';
-import { fromEvent, interval, of, concat, combineLatest, zip, merge, race, EMPTY, timer, forkJoin, iif, from } from 'rxjs';
+import { delay, switchMap, take, pluck, map, tap, takeLast, first, mapTo, startWith, ignoreElements, endWith, scan, withLatestFrom, timeoutWith, audit, auditTime } from 'rxjs/operators';
+import { fromEvent, interval, of, concat, combineLatest, zip, merge, race, EMPTY, timer, forkJoin, iif, from, NEVER } from 'rxjs';
 import { ajax } from 'rxjs/ajax';
 
 // Task 1. concat()
@@ -135,7 +135,7 @@ import { ajax } from 'rxjs/ajax';
 // При каждом клике поток должен выдавать значение из массива colors. 
 // После выдачи всех элементов из массива colors поток должен завершиться.
 // Создайте поток nextText$ событий click по кнопке btnNextText. При каждом клике поток должен выдавать
-// значение из массива text. После выдачи всех элементов из массива colors поток должен завершиться.
+// значение из массива text. После выдачи всех элементов из массива text поток должен завершиться.
 // Используйте: scan, map, take. 
 // Запустите потоки, используя функцию run. 
 // Для первого потока задайте конфиг объект для функции {next: 'Next color: '}
@@ -167,10 +167,89 @@ import { ajax } from 'rxjs/ajax';
 (function task7() {
     const colors = ['brown', 'red', 'maroon', 'olive', 'blue', 'lime'];
     const text = ['I am the best', 'I know RxJS', 'I love TypeScript', 'JavaScript Guru', 'Angular Lover'];
+
+    // 1.
+    const nextColor$ = fromEvent(document.getElementById("btnNextColor"), "click").pipe(take(colors.length));
+    const task1_1$ = zip(nextColor$, from(colors)).pipe(map(data => data[1]));
+    run(task1_1$, { next: 'Next color: ' });
+
+    const nextText$ = fromEvent(document.getElementById("btnNextText"), "click").pipe(take(text.length));
+    const task1_2$ = zip(nextText$, from(text)).pipe(map(data => data[1]));
+    run(task1_2$, { next: 'Next text: ' });
+    // !1.
+
+    // 2.
+    const task2$ = zip(task1_1$, task1_2$).pipe(tap(([color, text]) => addItem(text, { color })));
+    //task2$.subscribe();
+    // !2.
+
+    // 3.
+    const task3$ = combineLatest([task1_1$, task1_2$]).pipe(tap(([color, text]) => addItem(text, { color })));
+    //task3$.subscribe();
+    // !3.
+
+    // 4.
+    const task4$ = task1_1$.pipe(withLatestFrom(task1_2$)).pipe(tap(([color, text]) => addItem(text, { color })));
+    //task4$.subscribe();
+    // !4.
+
+    // 5.
+    const task5_1$ = forkJoin([task1_1$, task1_2$]).pipe(tap(([color, text]) => addItem(text, { color })));
+    //task5_1$.subscribe();
+
+    const task5_2$ = forkJoin([task1_1$.pipe(switchMap(() => NEVER)), task1_2$]).pipe(tap(([color, text]) => addItem(text, { color: color })));
+    //task5_2$.subscribe();
+    // !5.
 })();
 
+// CustomTask 1. race()
+// Аналог System.Threading.Tasks.Task.WaitAny().
+// Есть request$, который очень долго выполняется, например отправляет запрос ajax('http://jsonplaceholder.typicode.com/users')
+// с большой задержкой. У вас стоит условие, если запрос выполняется больше 3 секунд, то его надо отменять, так как
+// слишком долгое время ожидания.
+(function task5() {
+    const request$ = timer(5000).pipe(switchMap(() => ajax('http://jsonplaceholder.typicode.com/users')));
+    const maxWaitTime$ = timer(3000).pipe(take(1), mapTo("Cancel request"));
+
+    const stream$ = race(request$, maxWaitTime$);
+
+    //run(stream$);
+})();
+
+// CustomTask 2. withLatestFrom()
+// Создайте поток randomColor$, который через случайный интервал random(200, 500) будет эмитать случайный цвет из массива colors.
+// Создайте поток data$, который по нажатию на runBtn будет отправлять запрос ajax('http://jsonplaceholder.typicode.com/users')
+// и из результата запроса забирать 3 случайных имени пользователей и затем эмитать их по очереди.
+// Соедините эти потоки таким образом, чтобы по каждому нажатию на кнопку runBtn имена пользователей выводились последним
+// выбранным цветом (addItem) из потока randomColor$.
+(function task5() {
+
+    function random(min: number, max: number) {
+        const pause = Math.floor(Math.random() * (max - min)) + min;
+        return pause;
+    }
+
+    const infiniteRandomDelay$ = timer(0, 150).pipe(auditTime(random(200, 500)));
+
+    const colors = ['brown', 'red', 'maroon', 'olive', 'blue', 'lime'];
+    const randomColor$ = infiniteRandomDelay$.pipe(map(() => colors[random(0, colors.length)]));
+
+    const data$ = fromEvent(document.getElementById("runBtn"), "click")
+        .pipe(
+            switchMap(() => ajax('http://jsonplaceholder.typicode.com/users')),
+            switchMap(r => {
+                const start = random(0, r.response.length - 3);
+                const end = random(start + 1, start + 3);
+                return from(r.response.slice(start, end));
+            }),
+            map((u: any) => u.name),
+        );;
 
 
+    const stream$ = data$.pipe(withLatestFrom(randomColor$), tap(([name, color]) => addItem(name, { color })));
+    stream$.subscribe()
+
+})();
 
 
 export function runner() { }

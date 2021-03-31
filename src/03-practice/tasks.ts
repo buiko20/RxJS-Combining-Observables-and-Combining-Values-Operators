@@ -207,7 +207,7 @@ import { ajax } from 'rxjs/ajax';
 // Есть request$, который очень долго выполняется, например отправляет запрос ajax('http://jsonplaceholder.typicode.com/users')
 // с большой задержкой. У вас стоит условие, если запрос выполняется больше 3 секунд, то его надо отменять, так как
 // слишком долгое время ожидания.
-(function task5() {
+(function CustomTask1() {
     const request$ = timer(5000).pipe(switchMap(() => ajax('http://jsonplaceholder.typicode.com/users')));
     const maxWaitTime$ = timer(3000).pipe(take(1), mapTo("Cancel request"));
 
@@ -222,7 +222,7 @@ import { ajax } from 'rxjs/ajax';
 // и из результата запроса забирать 3 случайных имени пользователей и затем эмитать их по очереди.
 // Соедините эти потоки таким образом, чтобы по каждому нажатию на кнопку runBtn имена пользователей выводились последним
 // выбранным цветом (addItem) из потока randomColor$.
-(function task5() {
+(function CustomTask2() {
 
     function random(min: number, max: number) {
         const pause = Math.floor(Math.random() * (max - min)) + min;
